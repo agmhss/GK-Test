@@ -221,36 +221,52 @@
         }
 
         function renderQuestion() {
-            if(currentQIndex >= 20) return showResults();
-            
-            clearInterval(timer);
-            timeLeft = 30;
-            updateTimerUI();
-            
-            const q = quizData[currentQIndex];
-            document.getElementById('q-number').innerText = currentQIndex + 1;
-            document.getElementById('question-text').innerText = q.q;
-            document.getElementById('progress-bar').style.width = ((currentQIndex + 1) / 20 * 100) + "%";
-            
-            const optionsBox = document.getElementById('options-container');
-            optionsBox.innerHTML = '';
-            document.getElementById('feedback-area').innerText = '';
+    if(currentQIndex >= 20) return showResults();
+    
+    clearInterval(timer);
+    timeLeft = 30;
+    updateTimerUI();
+    
+    const q = quizData[currentQIndex];
+    document.getElementById('q-number').innerText = currentQIndex + 1;
+    document.getElementById('question-text').innerText = q.q;
+    document.getElementById('progress-bar').style.width = ((currentQIndex + 1) / 20 * 100) + "%";
+    
+    const optionsBox = document.getElementById('options-container');
+    optionsBox.innerHTML = '';
+    document.getElementById('feedback-area').innerText = '';
 
-            q.a.forEach((opt, idx) => {
-                const btn = document.createElement('button');
-                btn.className = "p-4 text-left border-2 border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition font-medium";
-                btn.innerText = opt;
-                btn.onclick = () => handleSubmission(idx);
-                optionsBox.appendChild(btn);
-            });
+    // --- SHUFFLE LOGIC START ---
+    // 1. Get the text of the correct answer before shuffling
+    const correctAnswerText = q.a[q.c];
 
-            timer = setInterval(() => {
-                timeLeft--;
-                updateTimerUI();
-                if(timeLeft <= 0) handleSubmission(-1);
-            }, 1000);
-        }
+    // 2. Create a shuffled copy of the options
+    const shuffledOptions = [...q.a].sort(() => Math.random() - 0.5);
+    // --- SHUFFLE LOGIC END ---
 
+    shuffledOptions.forEach((opt) => {
+        const btn = document.createElement('button');
+        btn.className = "p-4 text-left border-2 border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition font-medium";
+        btn.innerText = opt;
+        
+        btn.onclick = () => {
+            // Disable all buttons once an answer is picked
+            const allBtns = optionsBox.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+            
+            // Check if the clicked button's text matches the correct answer text
+            handleSubmission(opt === correctAnswerText, btn, correctAnswerText);
+        };
+        optionsBox.appendChild(btn);
+    });
+
+    timer = setInterval(() => {
+        timeLeft--;
+        updateTimerUI();
+        if(timeLeft <= 0) handleSubmission(false, null, correctAnswerText);
+    }, 1000);
+}
+        
         function updateTimerUI() {
             const t = document.getElementById('timer-circle');
             t.innerText = timeLeft;
@@ -258,30 +274,34 @@
             else t.classList.remove('border-red-500', 'text-red-500');
         }
 
-        function handleSubmission(choice) {
-            clearInterval(timer);
-            const q = quizData[currentQIndex];
-            const btns = document.getElementById('options-container').children;
-            const feedback = document.getElementById('feedback-area');
+        function handleSubmission(isCorrect, clickedBtn, correctText) {
+    clearInterval(timer);
+    const feedback = document.getElementById('feedback-area');
+    const optionsBox = document.getElementById('options-container');
+    const allBtns = optionsBox.querySelectorAll('button');
 
-            if(choice === q.c) {
-                score++;
-                document.getElementById('score-display').innerText = score;
-                feedback.innerText = "✨ Excellent! Correct Answer ✨";
-                feedback.className = "mt-8 text-center h-10 font-bold text-xl text-green-500";
-                btns[choice].classList.add('correct-ans');
-            } else {
-                feedback.innerText = "Better luck next time!";
-                feedback.className = "mt-8 text-center h-10 font-bold text-xl text-red-500";
-                if(choice !== -1) btns[choice].classList.add('wrong-ans');
-                btns[q.c].classList.add('correct-ans');
-            }
+    if(isCorrect) {
+        score++;
+        document.getElementById('score-display').innerText = score;
+        feedback.innerText = "🎉 Congratulations! Correct!";
+        feedback.className = "mt-8 text-center h-10 font-bold text-xl text-green-600";
+        if(clickedBtn) clickedBtn.classList.add('correct-ans');
+    } else {
+        feedback.innerText = "Oops! That's not right.";
+        feedback.className = "mt-8 text-center h-10 font-bold text-xl text-red-500";
+        if(clickedBtn) clickedBtn.classList.add('wrong-ans');
+        
+        // Find and highlight the correct one in green
+        allBtns.forEach(btn => {
+            if(btn.innerText === correctText) btn.classList.add('correct-ans');
+        });
+    }
 
-            setTimeout(() => {
-                currentQIndex++;
-                renderQuestion();
-            }, 1800);
-        }
+    setTimeout(() => {
+        currentQIndex++;
+        renderQuestion();
+    }, 2000);
+}
 
         function showResults() {
             document.getElementById('quiz-screen').classList.add('hidden');
