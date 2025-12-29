@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TN Global Genius Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        .hidden { display: none; }
+        .correct { background-color: #10b981 !important; color: white; }
+        .wrong { background-color: #ef4444 !important; color: white; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans">
+
+    <div id="setup-screen" class="max-w-md mx-auto mt-20 p-8 bg-white rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold text-blue-600 mb-6 text-center">Student Portal</h1>
+        <div class="space-y-4">
+            <input type="text" id="student-name" placeholder="Full Name" class="w-full p-3 border rounded">
+            <input type="text" id="student-class" placeholder="Class (e.g. 8th)" class="w-full p-3 border rounded">
+            <input type="text" id="student-sec" placeholder="Section" class="w-full p-3 border rounded">
+            <button onclick="startQuiz()" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">Start Quiz</button>
+        </div>
+    </div>
+
+    <div id="quiz-screen" class="hidden max-w-2xl mx-auto mt-10 p-6 bg-white rounded-xl shadow-2xl">
+        <div class="flex justify-between items-center mb-6">
+            <div class="text-lg font-bold">Score: <span id="score-box" class="text-green-600">0</span></div>
+            <div id="timer" class="text-xl font-mono bg-yellow-100 px-4 py-1 rounded-full border-2 border-yellow-400">30s</div>
+        </div>
+        
+        <div id="question-container">
+            <p id="q-text" class="text-xl mb-6 font-semibold"></p>
+            <div id="options-grid" class="grid grid-cols-1 gap-4"></div>
+        </div>
+
+        <div id="feedback" class="mt-6 text-center font-bold text-lg h-8"></div>
+    </div>
+
+    <div id="result-screen" class="hidden max-w-2xl mx-auto mt-10 p-8 bg-white rounded-xl shadow-2xl text-center">
+        <h2 class="text-4xl font-bold text-blue-600 mb-4">Quiz Completed!</h2>
+        <p class="text-2xl mb-6">Final Score: <span id="final-score"></span>/20</p>
+        
+        <div class="bg-yellow-50 p-6 rounded-lg border-2 border-yellow-200 mb-8">
+            <h3 class="text-xl font-bold mb-2">🏆 Hall of Fame Candidate</h3>
+            <p id="hof-details" class="italic text-gray-700"></p>
+        </div>
+
+        <button onclick="generatePDF()" class="bg-green-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-green-700">Download Certificate</button>
+    </div>
+
+    <script>
+        // QUESTION BANK (Sample subset of 100 for demonstration)
+        const questionBank = [
+            // Tamil Nadu - Easy
+            { q: "What is the state animal of Tamil Nadu?", a: ["Nilgiri Tahr", "Tiger", "Elephant", "Leopard"], c: 0, r: "TN", d: "easy" },
+            { q: "Which city is known as the 'Gateway to South India'?", a: ["Chennai", "Madurai", "Trichy", "Coimbatore"], c: 0, r: "TN", d: "easy" },
+            { q: "What is the official language of Tamil Nadu?", a: ["Tamil", "Telugu", "Malayalam", "Hindi"], c: 0, r: "TN", d: "easy" },
+            // India - Easy
+            { q: "Who is known as the Father of the Nation in India?", a: ["Mahatma Gandhi", "Nehru", "Subhash Chandra Bose", "B.R. Ambedkar"], c: 0, r: "IN", d: "easy" },
+            { q: "What is the capital of India?", a: ["New Delhi", "Mumbai", "Kolkata", "Chennai"], c: 0, r: "IN", d: "easy" },
+            // World - Easy
+            { q: "Which is the largest ocean in the world?", a: ["Pacific", "Atlantic", "Indian", "Arctic"], c: 0, r: "W", d: "easy" },
+            // Medium/Hard examples...
+            { q: "In which year did the Battle of Talikota take place?", a: ["1565", "1526", "1757", "1857"], c: 0, r: "IN", d: "hard" },
+            { q: "Which Chola King built the Brihadisvara Temple in Thanjavur?", a: ["Raja Raja Chola I", "Rajendra Chola", "Karikala Chola", "Aditya Chola"], c: 0, r: "TN", d: "medium" }
+            // Note: In a real app, you would add all 100 objects here following this pattern.
+        ];
+
+        // Fill remaining slots to simulate 100 questions
+        for(let i=0; i<90; i++) {
+            questionBank.push({
+                q: `General Knowledge Question #${i+10}`,
+                a: ["Correct Answer", "Option B", "Option C", "Option D"],
+                c: 0,
+                r: i%3==0 ? "TN" : (i%3==1 ? "IN" : "W"),
+                d: i%5==0 ? "hard" : (i%5==1 ? "medium" : "easy")
+            });
+        }
+
+        let currentQuiz = [];
+        let currentIndex = 0;
+        let score = 0;
+        let timer;
+        let timeLeft = 30;
+
+        function startQuiz() {
+            const name = document.getElementById('student-name').value;
+            if(!name) return alert("Please enter your name");
+            
+            // Logic to pick 20 specific questions
+            const tn = questionBank.filter(q => q.r === "TN");
+            const ind = questionBank.filter(q => q.r === "IN");
+            const world = questionBank.filter(q => q.r === "W");
+
+            // Simplified selector (for 20 questions total)
+            currentQuiz = [...tn.slice(0, 8), ...ind.slice(0, 8), ...world.slice(0, 4)];
+            currentQuiz = currentQuiz.sort(() => Math.random() - 0.5);
+
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            showQuestion();
+        }
+
+        function showQuestion() {
+            if(currentIndex >= 20) return endQuiz();
+            
+            clearInterval(timer);
+            timeLeft = 30;
+            updateTimerDisplay();
+            
+            const q = currentQuiz[currentIndex];
+            document.getElementById('q-text').innerText = `${currentIndex + 1}. ${q.q}`;
+            const grid = document.getElementById('options-grid');
+            grid.innerHTML = '';
+            document.getElementById('feedback').innerText = '';
+
+            q.a.forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.className = "p-4 text-left border-2 rounded-lg hover:bg-gray-50 transition";
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(i);
+                grid.appendChild(btn);
+            });
+
+            timer = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                if(timeLeft <= 0) checkAnswer(-1);
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const display = document.getElementById('timer');
+            display.innerText = timeLeft + "s";
+            display.style.color = timeLeft < 10 ? 'red' : 'black';
+        }
+
+        function checkAnswer(choice) {
+            clearInterval(timer);
+            const q = currentQuiz[currentIndex];
+            const buttons = document.getElementById('options-grid').children;
+            
+            if(choice === q.c) {
+                score++;
+                document.getElementById('score-box').innerText = score;
+                document.getElementById('feedback').innerText = "🎉 Congratulations! Correct!";
+                document.getElementById('feedback').className = "mt-6 text-center font-bold text-lg text-green-600";
+                buttons[choice].classList.add('correct');
+            } else {
+                document.getElementById('feedback').innerText = "Oops! Next time...";
+                document.getElementById('feedback').className = "mt-6 text-center font-bold text-lg text-red-600";
+                if(choice !== -1) buttons[choice].classList.add('wrong');
+                buttons[q.c].classList.add('correct');
+            }
+
+            setTimeout(() => {
+                currentIndex++;
+                showQuestion();
+            }, 2000);
+        }
+
+        function endQuiz() {
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+            
+            const name = document.getElementById('student-name').value;
+            const cls = document.getElementById('student-class').value;
+            const sec = document.getElementById('student-sec').value;
+            document.getElementById('hof-details').innerText = `${name} | Class: ${cls} | Section: ${sec}`;
+        }
+
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+            const name = document.getElementById('student-name').value;
+            
+            // Border
+            doc.setLineWidth(5);
+            doc.setDrawColor(41, 128, 185);
+            doc.rect(10, 10, 277, 190);
+            
+            // Content
+            doc.setFontSize(40);
+            doc.setTextColor(41, 128, 185);
+            doc.text("CERTIFICATE OF ACHIEVEMENT", 148, 60, null, null, 'center');
+            
+            doc.setFontSize(20);
+            doc.setTextColor(0, 0, 0);
+            doc.text("This is to certify that", 148, 90, null, null, 'center');
+            
+            doc.setFontSize(30);
+            doc.setFont("helvetica", "bolditalic");
+            doc.text(name, 148, 110, null, null, 'center');
+            
+            doc.setFontSize(20);
+            doc.setFont("helvetica", "normal");
+            doc.text(`has successfully completed the General Knowledge Challenge`, 148, 130, null, null, 'center');
+            doc.text(`with a score of ${score}/20`, 148, 145, null, null, 'center');
+            
+            doc.save(`Certificate_${name}.pdf`);
+        }
+    </script>
+</body>
+</html>
